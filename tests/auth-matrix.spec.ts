@@ -24,8 +24,9 @@ function compile(name: string, seen = new Map<string, string>()): string {
   let js = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText
-  for (const match of [...js.matchAll(/from ['"]\.\/(\w[\w-]*)['"]/g)]) {
-    js = js.replaceAll(`'./${match[1]}'`, `'${compile(match[1], seen)}'`).replaceAll(`"./${match[1]}"`, `"${compile(match[1], seen)}"`)
+  for (const match of [...js.matchAll(/from ['"](\.{1,2}\/[\w/-]+)['"]/g)]) {
+    const dependency = compile(join(dirname(name), match[1]), seen)
+    js = js.replaceAll(`'${match[1]}'`, `'${dependency}'`).replaceAll(`"${match[1]}"`, `"${dependency}"`)
   }
   const url = 'data:text/javascript;base64,' + Buffer.from(js).toString('base64')
   seen.set(name, url)
@@ -35,6 +36,7 @@ function compile(name: string, seen = new Map<string, string>()): string {
 const authModule = await import(compile('auth'))
 const oauthModule = await import(compile('oauth'))
 const accessModule = await import(compile('access'))
+const worker = (await import(compile('../index'))).default
 
 const SECRET = 'test-session-secret-'.padEnd(48, 'x')
 const OAUTH_ENV = {
@@ -190,5 +192,129 @@ test.describe('Cloudflare Access JWT verification', () => {
     const spoofed = req({ 'cf-access-authenticated-user-email': 'owner@example.com' })
     expect(await accessModule.verifyAccessJwt(spoofed, env)).toBeNull()
     expect((await authModule.authenticate(spoofed, env)).ok).toBe(false)
+  })
+})
+
+
+test.describe('admin sign-in page', () => {
+  // Synthetic production bindings only; these tests never write to D1 or use real secrets.
+  const env = {
+    ...OAUTH_ENV,
+    ENVIRONMENT: 'production',
+    ASSETS: { fetch: async () => new Response('app-shell', { headers: { 'content-type': 'text/html' } }) },
+    DB: { prepare: () => { throw new Error('Unexpected database access before authentication') } },
+  }
+  const request = (path: string, init?: RequestInit) => new Request('https://portfolio.example' + path, init)
+
+  test('signed-out admin serves the login shell without starting OAuth', async () => {
+    for (const path of ['/admin', '/admin/projects', '/admin/projects/1/edit']) {
+      const response = await worker.fetch(request(path), env)
+      expect(response.status).toBe(200)
+      expect(response.headers.get('location')).toBeNull()
+      expect(response.headers.get('set-cookie')).toBeNull()
+      expect(response.headers.get('cache-control')).toBe('no-store, private')
+      expect(await response.text()).toBe('app-shell')
+    }
+    const unconfigured = await worker.fetch(request('/admin'), { ...env, GOOGLE_CLIENT_ID: '' })
+    expect(unconfigured.status).toBe(403)
+  })
+
+  test('every admin API method still refuses signed-out users before database access', async () => {
+    for (const path of ['/api/admin/session', '/api/admin/projects', '/api/admin/projects/1', '/api/admin/unknown']) {
+      for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
+        const response = await worker.fetch(request(path, { method, headers: { origin: 'https://portfolio.example' } }), env)
+        expect(response.status, method + ' ' + path).toBe(401)
+        expect(response.headers.get('cache-control')).toBe('no-store, private')
+        expect(await response.json()).not.toHaveProperty('projects')
+      }
+    }
+    const crossSite = await worker.fetch(request('/api/admin/projects', {
+      method: 'POST', headers: { origin: 'https://untrusted.example' },
+    }), env)
+    expect(crossSite.status).toBe(403)
+  })
+
+  test('authenticated Google sessions still reach the admin shell and session API', async () => {
+    const headers = { cookie: await sessionCookie('owner@example.com') }
+    const admin = await worker.fetch(request('/admin', { headers }), env)
+    expect(admin.status).toBe(200)
+    expect(await admin.text()).toBe('app-shell')
+    const session = await worker.fetch(request('/api/admin/session', { headers }), env)
+    expect(session.status).toBe(200)
+    expect((await session.json()).user).toMatchObject({ email: 'owner@example.com', source: 'google' })
+  })
+
+  test('login endpoint retains the Google redirect, callback and secure state cookie', async () => {
+    const response = await worker.fetch(request('/api/auth/login'), env)
+    expect(response.status).toBe(302)
+    const target = new URL(response.headers.get('location')!)
+    expect(target.origin + target.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+    expect(target.searchParams.get('redirect_uri')).toBe('https://portfolio.example/api/auth/callback/google')
+    expect(target.searchParams.get('response_type')).toBe('code')
+    expect(target.searchParams.get('state')).toBeTruthy()
+    const cookie = response.headers.get('set-cookie')!
+    for (const flag of ['HttpOnly', 'Secure', 'SameSite=Lax']) expect(cookie).toContain(flag)
+    expect((await worker.fetch(request('/api/auth/callback/google'), env)).status).toBe(401)
+  })
+
+  test('existing login UI waits for a click and exposes no admin data', async ({ page, baseURL }) => {
+    const requested: string[] = []
+    await page.route('**/*', async route => {
+      const url = new URL(route.request().url())
+      if (url.origin !== baseURL || !(url.pathname.startsWith('/admin') || url.pathname.startsWith('/api/admin/') || url.pathname === '/api/auth/login')) {
+        return route.continue()
+      }
+      requested.push(url.pathname)
+      const response = await worker.fetch(new Request(url), {
+        ...env,
+        // Match Vite's development CSP without enabling LOCAL_ADMIN_DEV.
+        ENVIRONMENT: process.env.PORTFOLIO_PRODUCTION === '1' ? 'production' : 'development',
+        ASSETS: { fetch: async () => fetch(baseURL + '/') },
+      })
+      // Exercise the real login handler but stop before navigating off-site to Google.
+      if (url.pathname === '/api/auth/login') {
+        expect(response.status).toBe(302)
+        expect(new URL(response.headers.get('location')!).hostname).toBe('accounts.google.com')
+        return route.fulfill({ status: 200, contentType: 'text/plain', body: 'Google redirect verified' })
+      }
+      await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() })
+    })
+    const response = await page.goto('/admin')
+    expect(response!.status()).toBe(200)
+    const login = page.getByRole('link', { name: 'Google-ээр нэвтрэх' })
+    await expect(login).toBeVisible()
+    await expect(login).toHaveAttribute('href', '/api/auth/login')
+    await expect(page).toHaveURL(baseURL + '/admin')
+    await expect(page.locator('.admin-header, .admin-main, .admin-stats')).toHaveCount(0)
+    expect(requested).toContain('/api/admin/session')
+    expect(requested).not.toContain('/api/admin/projects')
+    expect(requested).not.toContain('/api/auth/login')
+    await login.click()
+    await expect(page).toHaveURL(baseURL + '/api/auth/login')
+    expect(requested).toContain('/api/auth/login')
+  })
+
+  test('authenticated Google user still sees the existing dashboard', async ({ page, baseURL }) => {
+    const cookie = await sessionCookie('owner@example.com')
+    let projectReads = 0
+    await page.route('**/*', async route => {
+      const url = new URL(route.request().url())
+      if (url.origin !== baseURL || !(url.pathname.startsWith('/admin') || url.pathname.startsWith('/api/admin/'))) return route.continue()
+      const response = await worker.fetch(new Request(url, { headers: { cookie } }), {
+        ...env,
+        // Match Vite's development CSP without enabling LOCAL_ADMIN_DEV.
+        ENVIRONMENT: process.env.PORTFOLIO_PRODUCTION === '1' ? 'production' : 'development',
+        ASSETS: { fetch: async () => fetch(baseURL + '/') },
+        DB: { prepare: () => ({ all: async () => { projectReads++; return { results: [] } } }) },
+      })
+      await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() })
+    })
+    expect((await page.goto('/admin'))!.status()).toBe(200)
+    await expect(page.getByRole('heading', { name: 'Хяналтын самбар' })).toBeVisible()
+    await expect(page.locator('.admin-user')).toContainText('owner@example.com')
+    await expect(page.locator('.admin-stat')).toHaveCount(5)
+    await expect(page.getByRole('link', { name: 'Гарах' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Google-ээр нэвтрэх' })).toHaveCount(0)
+    expect(projectReads).toBeGreaterThan(0)
   })
 })

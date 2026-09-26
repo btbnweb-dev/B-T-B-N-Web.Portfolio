@@ -78,15 +78,15 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
   if (pathname.startsWith('/api/')) return handleApi(request, env, url)
 
   // ---- Admin UI ----
-  // The Worker refuses to serve the admin shell unless the request is authorised, so the
-  // interface cannot be reached in production before an auth provider is configured.
+  // With OAuth configured, the shell can show the existing sign-in UI. AdminApp
+  // renders the dashboard only after the independently protected session API succeeds.
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     const auth = await authenticate(request, env)
     if (!auth.ok) {
       if (auth.reason === 'not-allowlisted') {
         audit('admin.auth.denied', { reason: 'not-allowlisted', email: auth.email, ip: coarseIp(clientKey(request)) })
       }
-      if (isOAuthConfigured(env)) return new Response(null, { status: 302, headers: { location: '/api/auth/login' } })
+      if (isOAuthConfigured(env)) return env.ASSETS.fetch(request)
       return new Response(adminDeniedPage(), { status: 403, headers: { 'content-type': 'text/html; charset=utf-8' } })
     }
   }
