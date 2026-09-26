@@ -159,7 +159,8 @@ export async function handleCallback(request: Request, env: Env, url: URL): Prom
   const profile = await profileResponse.json() as { email?: string; email_verified?: boolean; name?: string }
 
   const email = (profile.email || '').toLowerCase()
-  if (!email || profile.email_verified === false) return denied('Google хаяг баталгаажаагүй байна.', url)
+  // Require an explicit `true`: a missing field must not be treated as verified.
+  if (!email || profile.email_verified !== true) return denied('Google хаяг баталгаажаагүй байна.', url)
   if (!adminEmails(env).includes(email)) {
     return denied(`${email} хаягт админ эрх олгоогүй байна.`, url, 403)
   }
