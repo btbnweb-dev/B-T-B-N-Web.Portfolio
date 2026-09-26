@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "btbn-web-portfolio",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // The static-asset layer answers before the Worker by default, which would both
+    // rewrite /api/* to index.html and let pages be served with no security headers.
+    // Routing everything through the Worker fixes both: it applies the CSP and related
+    // headers to every response, then falls through to ASSETS for genuine static files.
+    // Hashed build assets are excluded so they keep the asset layer's own caching.
+    "run_worker_first": ["/*", "!/assets/*"]
+  },
+  "observability": { "enabled": true },
+
+  // `wrangler dev` uses Wrangler's simulated D1 (Miniflare) under .wrangler/state and
+  // ignores `database_id`; a deployed Worker binds the real remote database below.
+  // The binding name stays DB because that is what worker/lib reads.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "btbn-portfolio-prod",
+      "database_id": "dad5a10d-554c-4f0e-831f-d3be5c823dce",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "vars": {
+    // Production default. `.dev.vars` overrides this locally and is never committed.
+    "ENVIRONMENT": "production"
+  }
+}

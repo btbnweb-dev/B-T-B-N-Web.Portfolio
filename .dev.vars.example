@@ -1,0 +1,24 @@
+# Local development variables for `wrangler dev`. Copy to `.dev.vars` (gitignored).
+# NEVER commit .dev.vars, and never paste GOOGLE_CLIENT_SECRET or SESSION_SECRET into
+# chat, issues or screenshots — treat both as passwords.
+
+# ---- Local admin bypass -----------------------------------------------------
+# Unlocks /admin with a simulated administrator so the CMS can be used without Google.
+# Honoured ONLY when ENVIRONMENT is exactly "development"; a deployed Worker uses
+# wrangler.jsonc's ENVIRONMENT=production, where this flag is ignored outright.
+ENVIRONMENT=development
+LOCAL_ADMIN_DEV=true
+
+# ---- Google OAuth -----------------------------------------------------------
+# Set LOCAL_ADMIN_DEV=false to test the real Google sign-in locally.
+# The client ID is public; the secret is not.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Signs the admin session cookie. Generate a fresh random value, e.g.
+#   node -e "console.log(crypto.randomUUID()+crypto.randomUUID())"
+SESSION_SECRET=
+
+# Comma-separated addresses allowed into the admin. Anyone else is refused after Google
+# confirms who they are. Removing an address revokes access on the next request.
+ADMIN_EMAILS=baysaabataa77@gmail.com,btbnweb@gmail.com
