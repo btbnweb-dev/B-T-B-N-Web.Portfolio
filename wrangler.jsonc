@@ -24,7 +24,7 @@
     {
       "binding": "DB",
       "database_name": "btbn-portfolio-prod",
-      "database_id": "dad5a10d-554c-4f0e-831f-d3be5c823dce",
+      "database_id": "385b43d1-de86-4394-ad28-da9f2a9b071e",
       "migrations_dir": "migrations"
     }
   ],
