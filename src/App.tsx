@@ -201,10 +201,9 @@ function CaseStudy({ project }: { project: Project }) {
             : project.id === 'gaming-course' ? 'Хичээл, код, тоглоомыг нэг дэлгэцэд.'
               : project.id === 'axion-x1' ? '3D загварыг scroll-оор задлах.'
                 : project.id === 'khure-residence' ? 'Архитектурын мэдээллийг дарааллаар үзүүлэх.'
-                  : project.id === 'suld-cashmere' ? '160 кадрыг scroll-тэй тааруулах.'
-                    : project.id === 'coffee-shop' ? 'Кофе шопын орчныг зураг, өнгөөр.'
-                      : project.id === 'lune-beauty' ? 'Үйлчилгээ, орчныг нэг өнгө аясаар.'
-                        : 'Төслийн зургуудыг голд нь.'}</h2>
+                  : project.id === 'coffee-shop' ? 'Кофе шопын орчныг зураг, өнгөөр.'
+                    : project.id === 'lune-beauty' ? 'Үйлчилгээ, орчныг нэг өнгө аясаар.'
+                      : 'Төслийн зургуудыг голд нь.'}</h2>
           <p>{project.design}</p>
           {project.tier === 'concept' && <div className={'design-palette palette-' + project.accent} aria-label="Төслийн өнгөний чиглэл"><span>01 / ҮНДСЭН</span><span>02 / ДЭВСГЭР</span><span>03 / АКЦЕНТ</span></div>}
         </section></Reveal>
@@ -231,10 +230,9 @@ function CaseStudy({ project }: { project: Project }) {
           : project.id === 'gaming-course' ? 'Дипломын ажлаас нээлттэй платформ.'
             : project.id === 'axion-x1' ? '3D бүтээгдэхүүний танилцуулгын туршилт.'
               : project.id === 'khure-residence' ? 'Орон сууцны төслийг нэг урсгалд.'
-                : project.id === 'suld-cashmere' ? 'Scroll бүрд хариулах 160 кадр.'
-                  : project.id === 'coffee-shop' ? 'Меню, орчин, байршил нэг хуудсанд.'
-                    : project.id === 'lune-beauty' ? 'Үйлчилгээ, галерей, цаг захиалга нэг дор.'
-                      : 'Төсөл, үйлчилгээ, үнийн санал нэг бүтэцтэй.'}</h2><p className="lead">{project.result}</p></section></Reveal>
+                : project.id === 'coffee-shop' ? 'Меню, орчин, байршил нэг хуудсанд.'
+                  : project.id === 'lune-beauty' ? 'Үйлчилгээ, галерей, цаг захиалга нэг дор.'
+                    : 'Төсөл, үйлчилгээ, үнийн санал нэг бүтэцтэй.'}</h2><p className="lead">{project.result}</p></section></Reveal>
       </div>
     </div>
 

@@ -8,8 +8,9 @@ import type { APIRequestContext } from '@playwright/test'
  * Each test cleans up the rows it creates so the suite can run repeatedly.
  */
 
+// SULD Cashmere is seeded but unpublished, so it never appears in public responses.
 const SEEDED = [
-  'citiled', 'gaming-course', 'axion-x1', 'khure-residence', 'suld-cashmere',
+  'citiled', 'gaming-course', 'axion-x1', 'khure-residence',
   'coffee-shop', 'lune-beauty', 'nomad-build',
 ]
 
@@ -59,9 +60,10 @@ test.describe('local D1 seed', () => {
     expect(citiled.features.length).toBe(6)
     expect(citiled.overview.length).toBeGreaterThan(100)
     expect(citiled.live_url).toBe('https://citiled.citiled-mn.workers.dev')
-    // Production work and the three flagship concepts retain feature weight.
+    // Production work and the published flagship concepts retain feature weight. SULD is
+    // still featured in the row but unpublished, so it must not surface here.
     expect(projects.filter((p: { featured: boolean }) => p.featured).map((p: { slug: string }) => p.slug))
-      .toEqual(['citiled', 'gaming-course', 'axion-x1', 'khure-residence', 'suld-cashmere'])
+      .toEqual(['citiled', 'gaming-course', 'axion-x1', 'khure-residence'])
   })
 
   test('public case study routes still resolve for every seeded project', async ({ page }) => {

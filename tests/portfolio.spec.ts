@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright'
 
 const routes = [
   '/', '/work', '/work/citiled', '/work/gaming-course', '/work/axion-x1',
-  '/work/khure-residence', '/work/suld-cashmere', '/work/coffee-shop',
+  '/work/khure-residence', '/work/coffee-shop',
   '/work/lune-beauty', '/work/nomad-build', '/services', '/about', '/contact',
 ]
 for (const width of [320, 390, 768, 1024, 1440]) {
@@ -39,12 +39,12 @@ for (const width of [320, 390, 768, 1024, 1440]) {
 test('project filtering and case study links preserve ordering', async ({ page }) => {
   await page.goto('/work')
   const group = page.getByRole('group', { name: 'Төслийн ангилал' })
-  for (const [filter, count] of [['Production', 1], ['Full-stack', 2], ['Landing Page', 2], ['Concept', 6], ['Бүгд', 8]] as const) {
+  for (const [filter, count] of [['Production', 1], ['Full-stack', 2], ['Landing Page', 2], ['Concept', 5], ['Бүгд', 7]] as const) {
     await group.getByRole('button', { name: filter }).click()
     await expect(page.locator('.feature-project, .concept-card')).toHaveCount(count)
     await expect(group.getByRole('button', { name: filter })).toHaveAttribute('aria-pressed', 'true')
   }
-  for (const slug of ['citiled', 'gaming-course', 'axion-x1', 'khure-residence', 'suld-cashmere', 'coffee-shop', 'lune-beauty', 'nomad-build']) {
+  for (const slug of ['citiled', 'gaming-course', 'axion-x1', 'khure-residence', 'coffee-shop', 'lune-beauty', 'nomad-build']) {
     await page.goto('/work')
     await page.locator('.project-link[href="/work/' + slug + '"]').click()
     await expect(page).toHaveURL('/work/' + slug)
@@ -221,7 +221,8 @@ test('service workflow is keyboard operable', async ({ page }) => {
 test('major and flagship projects expose live site links and outrank secondary concepts', async ({ page }) => {
   await page.goto('/')
   // Citiled and ArenaHub lead the page as full-width feature blocks.
-  await expect(page.locator('.feature-project')).toHaveCount(5)
+  // Four features (Citiled, ArenaHub, AXION X1, KHURE) since SULD was unpublished.
+  await expect(page.locator('.feature-project')).toHaveCount(4)
   await expect(page.locator('.concept-card')).toHaveCount(3)
   await expect(page.locator('.feature-project').first().locator('h3')).toHaveText('Citiled')
   await expect(page.locator('.feature-project').nth(1).locator('h3')).toHaveText('ArenaHub')
@@ -332,7 +333,6 @@ const LIVE: Record<string, string> = {
   'gaming-course': 'https://btbn-arenahub.vercel.app',
   'axion-x1': 'https://btbn-axion-gpu.vercel.app',
   'khure-residence': 'https://btbn-khure-resideence.vercel.app',
-  'suld-cashmere': 'https://btbn-suld-cashmere.vercel.app',
   'coffee-shop': 'https://btbn-morrow-coffee.vercel.app',
   'lune-beauty': 'https://btbn-lune-beauty.vercel.app',
   'nomad-build': 'https://btbn-nomad-build.vercel.app',
